@@ -401,7 +401,7 @@ export class ProjectBuilder {
     const archiveName = `${this.config.appName}-${Date.now()}.zip`;
     const archivePath = path.join(this.archiveDir, archiveName);
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<string>(async (resolve, reject) => {
       const output = fsSync.createWriteStream(archivePath);
       const archive = archiver('zip', {
         zlib: { level: 9 }, // Максимальное сжатие
@@ -419,34 +419,43 @@ export class ProjectBuilder {
       // Отправляем архив в файл
       archive.pipe(output);
 
-      // Добавляем файлы проекта, исключая ненужные
-      archive.directory(this.projectPath, this.config.appName, {
-        filter: (entry) => {
-          // Исключаем node_modules, .git, .next и другие временные файлы
-          const excludePatterns = [
-            'node_modules',
-            '.git',
-            '.next',
-            '.cache',
-            'dist',
-            'build',
-            '.DS_Store',
-            '*.log',
-          ];
+      try {
+        // Получаем все файлы проекта, исключая ненужные
+        const excludePatterns = [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/.cache/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/.DS_Store',
+          '**/*.log',
+        ];
 
-          const entryPath = entry.name || entry.prefix || '';
-          return !excludePatterns.some((pattern) => {
-            if (pattern.includes('*')) {
-              const regex = new RegExp(pattern.replace('*', '.*'));
-              return regex.test(entryPath);
-            }
-            return entryPath.includes(pattern);
-          });
-        },
-      });
+        const allFiles = await glob('**/*', {
+          cwd: this.projectPath,
+          dot: true,
+          absolute: false,
+          ignore: excludePatterns,
+        });
 
-      // Завершаем архивацию
-      archive.finalize();
+        // Добавляем каждый файл в архив
+        for (const file of allFiles) {
+          const filePath = path.join(this.projectPath, file);
+          const archiveEntryPath = path.join(this.config.appName, file);
+          
+          // Проверяем, что это файл, а не директория
+          const stats = await fs.stat(filePath);
+          if (stats.isFile()) {
+            archive.file(filePath, { name: archiveEntryPath });
+          }
+        }
+
+        // Завершаем архивацию
+        archive.finalize();
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 

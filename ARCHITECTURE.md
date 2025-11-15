@@ -418,3 +418,4 @@ if (config.yourFeature === 'your-plugin') {
 4. **Шаблоны могут быть локальными или из create-vite** - настраивается в `getTemplatePath()`
 
 
+
