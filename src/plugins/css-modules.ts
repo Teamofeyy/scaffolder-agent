@@ -12,7 +12,7 @@ export const cssModulesPlugin: Plugin = {
 
   getAdditionalFiles(config: MasterConfig) {
     const isTypeScript = config.framework === 'react' || config.framework === 'nextjs';
-    
+
     if (!isTypeScript) {
       return [];
     }
@@ -33,5 +33,6 @@ declare module '*.module.scss' {
     ];
   },
 };
+
 
 

@@ -3,11 +3,21 @@ import { Plugin, PluginDependencies, PluginModification } from './index';
 
 export const tailwindPlugin: Plugin = {
   getDependencies(config: MasterConfig): PluginDependencies {
+    const isNext = config.framework === 'nextjs';
+
+    if (isNext) {
+      return {
+        devDependencies: {
+          "@tailwindcss/postcss": "^4",
+          "tailwindcss": "^4",
+        },
+      };
+    }
+
     return {
-      devDependencies: {
-        tailwindcss: '^4.0.0',
-        '@tailwindcss/postcss': '^4.0.0',
-        autoprefixer: '^10.4.20',
+      dependencies: {
+        "@tailwindcss/vite": "^4.1.17",
+        "tailwindcss": "^4.1.17",
       },
     };
   },
@@ -36,45 +46,44 @@ export const tailwindPlugin: Plugin = {
       content: '@import "tailwindcss";\n',
     });
 
-    // Update or create vite.config.ts
-    modifications.push({
-      file: 'vite.config.ts',
-      type: 'replace',
-      pattern: 'module.exports',
-      replacement: `module.exports = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-    autoprefixer: {},
-  },
-};`,
-    });
 
+    if (config.framework !== 'nextjs') {
+      modifications.push({
+        file: 'vite.config.ts',
+        type: 'replace',
+        pattern: 'import',
+        replacement: `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})`,
+      });
+    }
     return modifications;
   },
 
   getAdditionalFiles(config: MasterConfig) {
-    const isTypeScript = config.framework === 'react' || config.framework === 'nextjs';
-    const ext = isTypeScript ? 'ts' : 'js';
-
-    return [
-      {
-        path: `tailwind.config.${ext}`,
-        content: `import type { Config } from 'tailwindcss'
-
-const config: Config = {
-  content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-export default config`,
-      },
-    ];
+    if (config.framework === 'nextjs') {
+      return [
+        {
+          path: 'postcss.config.mjs',
+          content: `const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
   },
 };
+
+export default config;`
+        }
+      ]
+    }
+    return [];
+  }
+};
+
 
 
