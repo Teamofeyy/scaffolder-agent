@@ -93,6 +93,10 @@ export class ProjectBuilder {
   }
 
   private getTemplatePath(): string | null {
+    if (this.config.framework === 'nextjs') {
+      return this.getNextTemplatePath();
+    }
+
     // Option 1: Use local templates (if you have them)
     const localTemplatePath = path.join(
       __dirname,
@@ -136,15 +140,33 @@ export class ProjectBuilder {
       }
     }
 
-    // For Next.js, you need to provide local templates
-    if (this.config.framework === 'nextjs') {
-      const nextTemplatePath = path.join(__dirname, '..', 'templates', 'nextjs', 'ts');
-      if (fsSync.existsSync(nextTemplatePath)) {
-        return nextTemplatePath;
-      }
+    // Template not found
+    return null;
+  }
+
+  private getNextTemplatePath(): string | null {
+    const routing =
+      this.config.routing === 'pages-router' || this.config.routing === 'pages'
+        ? 'pages'
+        : 'app';
+    const tailwind = this.config.styling === 'tailwind' ? 'tail' : 'notail';
+    const linting =
+      this.config.linting === 'biome'
+        ? 'biome'
+        : this.config.linting === 'none'
+          ? 'no'
+          : 'es';
+
+    const templateDir = `${routing}-${tailwind}-${linting}`;
+    const templatePath = path.join(__dirname, 'templates', 'nextjs', templateDir);
+
+    if (fsSync.existsSync(templatePath)) {
+      return templatePath;
     }
 
-    // Template not found
+    console.warn(
+      `⚠️ Next.js template "${templateDir}" not found. Ensure templates/nextjs/${templateDir} exists.`
+    );
     return null;
   }
 
@@ -255,20 +277,25 @@ export class ProjectBuilder {
       },
       nextjs: {
         dependencies: {
-          next: '^14.0.0',
-          react: '^18.2.0',
-          'react-dom': '^18.2.0',
+          next: '16.0.6',
+          react: '19.2.0',
+          'react-dom': '19.2.0',
         },
         devDependencies: {
-          typescript: '^5.0.0',
-          '@types/node': '^20.0.0',
-          '@types/react': '^18.2.0',
-          '@types/react-dom': '^18.2.0',
+          "@tailwindcss/postcss": "^4",
+          "@types/node": "^20",
+          "@types/react": "^19",
+          "@types/react-dom": "^19",
+          "eslint": "^9",
+          "eslint-config-next": "16.0.6",
+          "tailwindcss": "^4",
+          "typescript": "^5"
         },
         scripts: {
-          dev: 'next dev',
-          build: 'next build',
-          start: 'next start',
+          "dev": "next dev",
+          "build": "next build",
+          "start": "next start",
+          "lint": "eslint"
         },
       },
     };
@@ -443,7 +470,7 @@ export class ProjectBuilder {
         for (const file of allFiles) {
           const filePath = path.join(this.projectPath, file);
           const archiveEntryPath = path.join(this.config.appName, file);
-          
+
           // Проверяем, что это файл, а не директория
           const stats = await fs.stat(filePath);
           if (stats.isFile()) {

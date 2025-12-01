@@ -5,6 +5,7 @@ export interface MasterConfig {
   routing: string;
   styling: string;
   stateManager: string;
+  linting?: 'eslint' | 'biome' | 'none';
 }
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';

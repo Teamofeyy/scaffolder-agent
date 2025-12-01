@@ -31,9 +31,11 @@ export const tailwindPlugin: Plugin = {
     switch (config.framework) {
       case 'vue':
         cssFile = 'src/style.css';
-        break
+        break;
       case 'nextjs':
-        cssFile = 'src/app/globals.css';
+        // Next.js app router хранит глобальные стили в корне `app`
+        // Без префикса `src`, чтобы не создавать лишнюю директорию
+        cssFile = 'app/globals.css';
         break;
       default:
         cssFile = 'src/index.css';
