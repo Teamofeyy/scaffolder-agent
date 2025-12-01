@@ -4,9 +4,8 @@ import path from 'path';
 import os from 'os';
 import archiver from 'archiver';
 import { copy } from './helpers/copy';
-import { install } from './helpers/install';
 import { getPlugins } from './plugins';
-import { MasterConfig, BuildResult, PackageManager } from './types';
+import { MasterConfig, BuildResult } from './types';
 import { async as glob } from 'fast-glob';
 import { Sema } from 'async-sema';
 
@@ -44,9 +43,6 @@ export class ProjectBuilder {
       console.log('📄 Creating additional files...');
       await this.createAdditionalFiles();
 
-      // Step 5: Install dependencies
-      console.log('📥 Installing dependencies...');
-
       // Step 6: Create ZIP archive
       console.log('📦 Creating archive...');
       const archivePath = await this.createArchive();
@@ -81,7 +77,9 @@ export class ProjectBuilder {
       cwd: templatePath,
       parents: true,
       rename(name) {
-        if (name === 'gitignore') {
+        // Многие шаблоны кладут файл как "gitignore" или "_gitignore",
+        // чтобы менеджеры пакетов его не съели. Всегда приводим к ".gitignore".
+        if (name === 'gitignore' || name === '_gitignore') {
           return '.gitignore';
         }
         if (name === 'README-template.md') {
@@ -198,6 +196,40 @@ export class ProjectBuilder {
       }
       if (pluginDeps.devDependencies) {
         allDevDependencies = { ...allDevDependencies, ...pluginDeps.devDependencies };
+      }
+    }
+
+    // Extra dependencies selected from UI (framework-agnostic)
+    const EXTRA_DEPENDENCY_MAP: Record<
+      string,
+      { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+    > = {
+      axios: { dependencies: { axios: '^1.13.2' } },
+      zod: { dependencies: { zod: '^4.1.13' } },
+      'date-fns': { dependencies: { 'date-fns': '^4.1.0' } },
+      lodash: { dependencies: { lodash: '^4.17.21' } },
+      clsx: { dependencies: { clsx: '^2.1.1' } },
+      zustand: { dependencies: { zustand: '^5.0.9' } },
+      jotai: { dependencies: { jotai: '^2.15.2' } },
+      'framer-motion': { dependencies: { 'framer-motion': '^12.23.25' } },
+      'react-hook-form': { dependencies: { 'react-hook-form': '^7.67.0' } },
+      bcrypt: { dependencies: { bcrypt: '^6.0.0' } },
+      jsonwebtoken: { dependencies: { jsonwebtoken: '^9.0.2' } },
+      uuid: { dependencies: { uuid: '^13.0.0' } },
+      dotenv: { dependencies: { dotenv: '^17.2.3' } },
+      cors: { dependencies: { cors: '^2.8.5' } },
+    };
+
+    if (this.config.extraDependencies?.length) {
+      for (const depId of this.config.extraDependencies) {
+        const extra = EXTRA_DEPENDENCY_MAP[depId];
+        if (!extra) continue;
+        if (extra.dependencies) {
+          allDependencies = { ...allDependencies, ...extra.dependencies };
+        }
+        if (extra.devDependencies) {
+          allDevDependencies = { ...allDevDependencies, ...extra.devDependencies };
+        }
       }
     }
 

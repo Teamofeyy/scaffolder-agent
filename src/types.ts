@@ -6,6 +6,7 @@ export interface MasterConfig {
   styling: string;
   stateManager: string;
   linting?: 'eslint' | 'biome' | 'none';
+  extraDependencies?: string[];
 }
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';

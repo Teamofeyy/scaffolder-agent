@@ -50,7 +50,11 @@ export function getPlugins(config: MasterConfig): Plugin[] {
   if (config.styling === 'tailwind') {
     plugins.push(tailwindPlugin);
   } else if (config.styling === 'css-modules') {
-    plugins.push(cssModulesPlugin);
+    // CSS Modules плагин имеет смысл только для Vite-проектов (React/Vue),
+    // для Next.js он может создавать лишние артефакты (`src/types/...`).
+    if (config.framework === 'react' || config.framework === 'vue') {
+      plugins.push(cssModulesPlugin);
+    }
   }
 
   return plugins;

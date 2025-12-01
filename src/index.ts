@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { ProjectBuilder } from './builder';
-import { MasterConfig, BuildResult } from './types';
+import { MasterConfig, BuildResult, Framework } from './types';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +31,96 @@ app.get('/health', (req, res) => {
  * 8. Отправка архива клиенту
  * 9. Удаление временных файлов
  */
+function validateConfig(config: MasterConfig): string | null {
+  const framework = config.framework as Framework;
+
+  const allowedFrameworks: Framework[] = ['react', 'vue', 'svelte', 'nextjs'];
+  if (!allowedFrameworks.includes(framework)) {
+    return `Unsupported framework: ${config.framework}`;
+  }
+
+  // Routing compatibility
+  // Для Next.js по умолчанию считаем, что используется app router,
+  // даже если фронт не прислал routing вообще.
+  const routing =
+    framework === 'nextjs'
+      ? (config.routing || 'app')
+      : (config.routing || 'none');
+  if (framework === 'react') {
+    const allowed = ['none', 'react-router'];
+    if (!allowed.includes(routing)) {
+      return `Routing "${routing}" is not supported for React`;
+    }
+  } else if (framework === 'vue') {
+    const allowed = ['none', 'vue-router'];
+    if (!allowed.includes(routing)) {
+      return `Routing "${routing}" is not supported for Vue`;
+    }
+  } else if (framework === 'svelte') {
+    if (routing !== 'none') {
+      return `Custom routing is not supported for Svelte in this builder`;
+    }
+  } else if (framework === 'nextjs') {
+    // Поддерживаем явные значения и "none" как синоним app router,
+    // чтобы старый фронт, который не знает про routing, тоже работал.
+    const allowed = ['none', 'app', 'app-router', 'pages', 'pages-router'];
+    if (!allowed.includes(routing)) {
+      return `Routing "${routing}" is not supported for Next.js`;
+    }
+  }
+
+  // Styling compatibility
+  const styling = config.styling || 'none';
+  if (framework === 'react' || framework === 'vue') {
+    const allowed = ['none', 'tailwind', 'css-modules'];
+    if (!allowed.includes(styling)) {
+      return `Styling "${styling}" is not supported for ${framework}`;
+    }
+  } else if (framework === 'svelte') {
+    const allowed = ['none', 'tailwind'];
+    if (!allowed.includes(styling)) {
+      return `Styling "${styling}" is not supported for Svelte`;
+    }
+  } else if (framework === 'nextjs') {
+    const allowed = ['none', 'tailwind'];
+    if (!allowed.includes(styling)) {
+      return `Styling "${styling}" is not supported for Next.js`;
+    }
+  }
+
+  // State manager compatibility
+  const state = config.stateManager || 'none';
+  if (framework === 'react') {
+    const allowed = ['none', 'redux-toolkit', 'zustand'];
+    if (!allowed.includes(state)) {
+      return `State manager "${state}" is not supported for React`;
+    }
+  } else if (framework === 'vue') {
+    const allowed = ['none', 'pinia'];
+    if (!allowed.includes(state)) {
+      return `State manager "${state}" is not supported for Vue`;
+    }
+  } else if (framework === 'svelte' || framework === 'nextjs') {
+    if (state !== 'none') {
+      return `State manager "${state}" is not supported for ${framework} in this builder`;
+    }
+  }
+
+  // Linting compatibility: используем только для Next.js,
+  // для остальных фреймворков опция игнорируется/не поддерживается.
+  if (framework === 'nextjs') {
+    const linting = config.linting || 'eslint';
+    const allowedLinting: Array<'eslint' | 'biome' | 'none'> = ['eslint', 'biome', 'none'];
+    if (!allowedLinting.includes(linting)) {
+      return `Linting "${linting}" is not supported for Next.js`;
+    }
+  } else if (config.linting) {
+    return `Linting option is only supported for Next.js projects`;
+  }
+
+  return null;
+}
+
 app.post('/build', async (req, res) => {
   let builder: ProjectBuilder | null = null;
   let archivePath: string | undefined;
@@ -43,6 +133,14 @@ app.post('/build', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: appName, framework, packageManager',
+      });
+    }
+
+    const compatibilityError = validateConfig(config);
+    if (compatibilityError) {
+      return res.status(400).json({
+        success: false,
+        error: compatibilityError,
       });
     }
 

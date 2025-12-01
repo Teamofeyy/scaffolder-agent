@@ -49,7 +49,9 @@ export const tailwindPlugin: Plugin = {
     });
 
 
-    if (config.framework !== 'nextjs') {
+    // Настройка Vite только для React. Для Vue/Svelte сейчас не трогаем конфиг,
+    // чтобы не ломать их дефолтную настройку.
+    if (config.framework === 'react') {
       modifications.push({
         file: 'vite.config.ts',
         type: 'replace',
